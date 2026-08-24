@@ -2,7 +2,7 @@
 class Discobox < Formula
   desc "Sandboxed development environments for coding agents"
   homepage "https://github.com/discobox-ai/discobox"
-  version "0.1.0-alpha.9"
+  version "0.1.0-alpha.10"
   license "Apache-2.0"
 
   on_macos do
@@ -10,19 +10,19 @@ class Discobox < Formula
     # refuses non-arm64, so an Intel binary would install and then fail at the
     # first pool.
     on_arm do
-      url "https://github.com/discobox-ai/discobox/releases/download/v0.1.0-alpha.9/discobox-darwin-arm64"
-      sha256 "b397189130f293b5ad6835f8d95fa40a3e00dfece55dc0419e46d28503db8dec"
+      url "https://github.com/discobox-ai/discobox/releases/download/v0.1.0-alpha.10/discobox-darwin-arm64"
+      sha256 "a6c57eba6c388c86dd7a244e1ded66c6bb9e3c3e3cb0c3ac25584ceed34f51de"
     end
   end
 
   on_linux do
     on_intel do
-      url "https://github.com/discobox-ai/discobox/releases/download/v0.1.0-alpha.9/discobox-linux-amd64"
-      sha256 "5b806edc2cddf2b8fee7c554b12a9146971b50f7c33ad6034d06e0fa7b5a717c"
+      url "https://github.com/discobox-ai/discobox/releases/download/v0.1.0-alpha.10/discobox-linux-amd64"
+      sha256 "5785e8553d4914ff6c03b2effd0d405b0fa9f6583fda2328ae8f20b4c13212e4"
     end
     on_arm do
-      url "https://github.com/discobox-ai/discobox/releases/download/v0.1.0-alpha.9/discobox-linux-arm64"
-      sha256 "d0036c782baca7f2fcc6e27a9580c7548cb7858899d6939aaaee66eb31204cc0"
+      url "https://github.com/discobox-ai/discobox/releases/download/v0.1.0-alpha.10/discobox-linux-arm64"
+      sha256 "f411ac15d5a3f92f85f12a0c7f4ed2eb4bcf08ad355ff2079ace3f59a838064a"
     end
   end
 
