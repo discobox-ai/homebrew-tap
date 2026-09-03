@@ -2,19 +2,24 @@
 #
 # The obvious design is the other way round: the release workflow pushes the
 # formula here. That needs a token with write access to this repository stored
-# in discobox-ai/discobox — a long-lived credential in another repo, to be
-# rotated and to leak. Triggering a workflow here rather than pushing does not
-# help: a cross-repo dispatch needs the same token.
+# in discobox-ai/discobox — a long-lived credential in another repo, able to
+# make the formula say anything.
 #
-# Pulling needs none. Reading a public repository's releases is unauthenticated,
-# and writing here uses this repository's own GITHUB_TOKEN. The cost is that the
-# formula lags a release by up to the interval below; workflow_dispatch is the
-# button for when that is too long to wait.
+# Pulling needs almost none. Reading a public repository's releases is
+# unauthenticated, and committing here uses this repository's own GITHUB_TOKEN.
+# What discobox holds is only enough to *start* this workflow: a token scoped to
+# this repository alone, which cannot write to it and can only run something
+# already defined here. That asymmetry is the whole reason the direction is
+# worth keeping.
+#
+# No cron. This polled every 30 minutes so that a release nobody dispatched
+# would still be picked up eventually, and that is exactly why it had to go: a
+# poll that quietly covers for a broken release step is a poll that stops anyone
+# noticing the step is broken. discobox's release fails instead, loudly, and
+# this runs when it is told to.
 name: Update formula
 
 on:
-  schedule:
-    - cron: "*/30 * * * *"
   workflow_dispatch:
 
 permissions:
