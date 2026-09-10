@@ -17,6 +17,11 @@
 # poll that quietly covers for a broken release step is a poll that stops anyone
 # noticing the step is broken. discobox's release fails instead, loudly, and
 # this runs when it is told to.
+#
+# Both channels are recomputed on every run, and whichever moved is committed
+# (discobox ADR 0105). One dispatch is therefore right after a tag is cut and
+# right after a release is blessed stable, and neither caller has to know which
+# formula it is about to change.
 name: Update formula
 
 on:
@@ -43,36 +48,82 @@ jobs:
           repository: discobox-ai/discobox
           path: .discobox-src
 
-      - name: Update to the latest stable release
+      - name: Regenerate both formulae
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -eu
 
-          # Only a stable release. `brew install discobox` should give the
-          # version people are meant to run, and this tap has one channel — an
-          # alpha published under the same formula name would silently become
-          # that. --exclude-pre-releases also skips drafts.
-          tag=$(gh release list --repo discobox-ai/discobox \
-                  --exclude-pre-releases --exclude-drafts --limit 1 \
-                  --json tagName --jq '.[0].tagName // ""')
-          if [ -z "$tag" ]; then
-            echo "discobox has no stable release yet; nothing to serve"
+          # discobox — the stable channel. Every release is *published* as a
+          # prerelease; one stops being one when a human unticks the box, which
+          # is the whole of what "stable" means (discobox ADR 0105). So the
+          # newest non-prerelease release is the newest blessed one, and that is
+          # what `brew install discobox` should give.
+          # --exclude-pre-releases also skips drafts.
+          stable=$(gh release list --repo discobox-ai/discobox \
+                     --exclude-pre-releases --exclude-drafts --limit 1 \
+                     --json tagName --jq '.[0].tagName // ""')
+
+          # discobox-dev — the latest channel: the newest dot release, blessed
+          # or not. An explicit prerelease tag (v1.2.3-rc1) is deliberately not
+          # it; that is a build you reach by naming it, not the newest thing
+          # there is. The filter is the same vMAJOR.MINOR.PATCH rule discobox's
+          # own DOT_RELEASE applies, expressed in jq because there is no
+          # generator to ask — a shape, not a version comparison, since GitHub
+          # already returns these newest-first.
+          dev=$(gh release list --repo discobox-ai/discobox \
+                  --exclude-drafts --limit 30 \
+                  --json tagName \
+                  --jq '[.[] | select(.tagName | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))] | .[0].tagName // ""')
+
+          if [ -z "$stable" ] && [ -z "$dev" ]; then
+            echo "discobox has no release to serve yet"
             exit 0
           fi
-          echo "latest stable release is $tag"
 
           mkdir -p Formula
-          .discobox-src/scripts/brew-formula.sh "$tag" discobox-ai/discobox Formula/discobox.rb
+          changed=""
 
-          if git diff --quiet -- Formula/discobox.rb; then
-            echo "the tap already serves $tag"
+          # Each channel is generated and staged separately, so a failure to
+          # reach one release does not leave the other half-written, and the
+          # commit message can name what actually moved.
+          #
+          # Staged before comparing: git does not track empty directories, so a
+          # formula this tap has never carried is an untracked file, and an
+          # unstaged diff of one is empty — which would report a push that never
+          # happened.
+          if [ -n "$stable" ]; then
+            echo "newest stable release is $stable"
+            .discobox-src/scripts/brew-formula.sh "$stable" discobox-ai/discobox Formula/discobox.rb
+            git add Formula/discobox.rb
+            git diff --cached --quiet -- Formula/discobox.rb || changed="discobox $stable"
+          else
+            echo "discobox has no blessed release yet; leaving the stable formula alone"
+          fi
+
+          if [ -n "$dev" ]; then
+            echo "newest dot release is $dev"
+            .discobox-src/scripts/brew-formula.sh --dev "$dev" discobox-ai/discobox Formula/discobox-dev.rb
+            git add Formula/discobox-dev.rb
+            if ! git diff --cached --quiet -- Formula/discobox-dev.rb; then
+              if [ -n "$changed" ]; then
+                changed="$changed, discobox-dev $dev"
+              else
+                changed="discobox-dev $dev"
+              fi
+            fi
+          else
+            echo "discobox has no dot release yet; leaving the dev formula alone"
+          fi
+
+          if [ -z "$changed" ]; then
+            echo "the tap already serves discobox $stable and discobox-dev $dev"
             exit 0
           fi
+
           git config user.name "discobox tap"
           git config user.email "noreply@discobox.ai"
-          git add Formula/discobox.rb
-          git commit -q -m "discobox $tag" \
-            -m "Generated from the assets $tag uploaded, by the tap's own update workflow."
+          git commit -q -m "$changed" \
+            -m "Generated from the assets those releases uploaded, by the tap's own update workflow."
           git push
-          echo "the tap now serves $tag"
+          echo "the tap now serves $changed"
